@@ -79,21 +79,32 @@ mp := sdkmetric.NewMeterProvider(
 
 tp := sdktrace.NewTracerProvider(
 	sdktrace.WithResource(res),
-	sdktrace.WithSampler(spanmetrics.NewAlwaysRecordSampler(userSampler)), // wrap your sampler
-	sdktrace.WithSpanProcessor(spanmetrics.NewSpanMetricsProcessor(mp)),   // add the processor
+	sdktrace.WithSampler(spanmetrics.NewAlwaysRecordSampler(spanmetrics.SamplerFromEnv())), // wrap the sampler
+	sdktrace.WithSpanProcessor(spanmetrics.NewSpanMetricsProcessor(mp)),                     // add the processor
 	sdktrace.WithBatcher(traceExporter),
 )
 otel.SetTracerProvider(tp) // otelhttp/otelgrpc spans now flow through it automatically
 ```
 
-Three touch-points: wrap your sampler, add the processor, and pass the `MeterProvider`. Any
+Three touch-points: wrap the sampler, add the processor, and pass the `MeterProvider`. Any
 `otelhttp`/`otelgrpc` middleware you already use is covered the moment it shares this
 `TracerProvider`.
 
-If `userSampler` is your existing head sampler (e.g.
-`sdktrace.ParentBased(sdktrace.TraceIDRatioBased(0.05))`), the wrapper keeps its export
-decision but records the spans it would have dropped, so the metrics see 100% of spans while
-trace export stays at 5%.
+The wrapper keeps your sampler's export decision but records the spans it would have dropped,
+so the metrics see 100% of spans while trace export stays at the configured rate.
+
+Choose the delegate to wrap based on how you configure sampling:
+
+- **Sampling set by env vars** (`OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG`): use
+  `spanmetrics.SamplerFromEnv()` as shown. Passing `WithSampler` overrides the SDK's own env
+  handling, so `SamplerFromEnv()` re-resolves those variables — without it, wrapping a literal
+  sampler would silently ignore your configured rate.
+- **Sampling set in code**: pass your sampler directly, e.g.
+  `spanmetrics.NewAlwaysRecordSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(0.05)))`.
+
+> **Note:** register the processor and the wrapped sampler together, exactly once. Adding the
+> processor without the sampler means it only sees exported spans (not 100%); registering it
+> twice double-counts.
 
 ## Configuration
 

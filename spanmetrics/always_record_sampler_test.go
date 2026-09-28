@@ -87,3 +87,12 @@ func TestAlwaysRecordSampler_DelegatesEveryCall(t *testing.T) {
 		t.Error("delegate ShouldSample was not called")
 	}
 }
+
+func TestAlwaysRecordSampler_NilDelegatePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic on nil delegate")
+		}
+	}()
+	NewAlwaysRecordSampler(nil)
+}

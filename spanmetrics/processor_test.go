@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric/noop"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -167,6 +168,55 @@ func TestNilProviderIsInert(t *testing.T) {
 	m := attrMap(attribute.NewSet(ended[0].Attributes()...))
 	absent(t, m, "aws.otel.span.metrics.schema")
 }
+
+// endedSpanAttrs runs one span through a TracerProvider carrying proc plus a span recorder,
+// and returns the attribute map of the single ended span. Used to assert whether the dedup
+// marker was stamped.
+func endedSpanAttrs(t *testing.T, proc sdktrace.SpanProcessor) map[attribute.Key]attribute.KeyValue {
+	t.Helper()
+	rec := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(proc),
+		sdktrace.WithSpanProcessor(rec),
+	)
+	_, span := tp.Tracer("t").Start(context.Background(), "op")
+	span.End() // must not panic
+	ended := rec.Ended()
+	if len(ended) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(ended))
+	}
+	return attrMap(attribute.NewSet(ended[0].Attributes()...))
+}
+
+// TestNoopMeterProviderIsInert: a no-op MeterProvider has no real metrics pipeline, so the
+// processor must stay inert. A noop provider has no reader to collect from, so we assert
+// inertness via the span side: the ended span must NOT carry the dedup marker, otherwise a
+// downstream generator would skip a span that was never actually metered (breaking
+// exactly-once).
+func TestNoopMeterProviderIsInert(t *testing.T) {
+	proc := NewSpanMetricsProcessor(noop.NewMeterProvider())
+	m := endedSpanAttrs(t, proc)
+	absent(t, m, "aws.otel.span.metrics.schema")
+}
+
+// TestTypedNilProviderIsInert: a typed-nil MeterProvider whose Meter method would panic on a
+// nil receiver must be handled gracefully — the constructor must not panic, and the resulting
+// processor must be inert (no dedup marker stamped).
+func TestTypedNilProviderIsInert(t *testing.T) {
+	var mp *noop.MeterProvider // typed nil; mp.Meter panics if dereferenced
+	proc := NewSpanMetricsProcessor(mp)
+	m := endedSpanAttrs(t, proc)
+	absent(t, m, "aws.otel.span.metrics.schema")
+}
+
+// NOTE on reader-less SDK providers: an empirical probe (see commit) showed that
+// sdkmetric.NewMeterProvider() with NO reader returns a REAL SDK instrument
+// (*metric.int64Inst) — the SAME concrete type as an SDK provider WITH a reader — not the
+// no-op instrument type. The two are therefore indistinguishable by type, so a reader-less SDK
+// provider is treated as ACTIVE by design: it is a real provider the caller deliberately built
+// (its measurements are silently dropped by the SDK, which is the caller's configuration, not
+// ours to second-guess). Only the no-op meter — which unambiguously signals "no pipeline" — is
+// treated as inert. Matches the Java plugin. Hence there is no TestReaderlessProviderInert.
 
 func TestDerivedAttributesReachMetric(t *testing.T) {
 	reader := sdkmetric.NewManualReader()

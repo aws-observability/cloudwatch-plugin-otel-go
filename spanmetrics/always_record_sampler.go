@@ -34,6 +34,11 @@ type alwaysRecordSampler struct {
 //
 //	sdktrace.WithSampler(spanmetrics.NewAlwaysRecordSampler(mySampler))
 func NewAlwaysRecordSampler(delegate sdktrace.Sampler) sdktrace.Sampler {
+	// Fail fast on a nil delegate rather than silently substituting a default
+	// sampler. This matches the JS/.NET/Python plugins, which reject nil.
+	if delegate == nil {
+		panic("spanmetrics: NewAlwaysRecordSampler requires a non-nil delegate sampler")
+	}
 	return alwaysRecordSampler{delegate: delegate}
 }
 
