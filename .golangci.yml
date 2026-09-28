@@ -1,0 +1,14 @@
+# Minimal, non-noisy golangci-lint config for the CloudWatch Plugin for OpenTelemetry (Go).
+# Keeps the default linter set and adds gofmt, govet, and staticcheck. Deliberately does NOT
+# enable strict/opinionated linters (e.g. exhaustruct, wsl) that would generate noise without
+# catching real defects.
+run:
+  timeout: 5m
+
+linters:
+  # Keep golangci-lint's default linters (errcheck, gosimple, govet, ineffassign,
+  # staticcheck, unused) and add gofmt explicitly.
+  enable:
+    - gofmt
+    - govet
+    - staticcheck
