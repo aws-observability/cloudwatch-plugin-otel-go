@@ -49,9 +49,9 @@ func newPipeline(t *testing.T) *pipeline {
 	if err != nil {
 		t.Fatalf("resource: %v", err)
 	}
-	// The generated metrics inherit the MeterProvider's resource (spec §5: client resource =
-	// the app's SDK resource, which carries service.name). In an app both providers share the
-	// same resource; the resource must be set on the MeterProvider for it to reach the metrics.
+	// The generated metrics inherit the MeterProvider's resource (the app's SDK resource,
+	// which carries service.name). In an app both providers share the same resource; the
+	// resource must be set on the MeterProvider for it to reach the metrics.
 	reader := sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(
 		sdkmetric.WithResource(res),
@@ -80,7 +80,7 @@ func (p *pipeline) collect(t *testing.T) map[string]metricdata.Metrics {
 			out[m.Name] = m
 		}
 	}
-	// service.name must live on the metric RESOURCE, not on datapoints (spec §3/§5).
+	// service.name must live on the metric RESOURCE, not on datapoints.
 	assertResourceServiceName(t, rm)
 	return out
 }

@@ -37,7 +37,7 @@ const (
 	nanosPerSecond = 1_000_000_000.0
 )
 
-// durationBuckets are the SpanMetricsConnector default boundaries expressed in seconds (spec §1).
+// durationBuckets are the SpanMetricsConnector default boundaries expressed in seconds.
 var durationBuckets = []float64{
 	0.002, 0.004, 0.006, 0.008, 0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 1, 1.4, 2, 5, 10, 15,
 }
@@ -63,8 +63,11 @@ func noopReferenceCounterType() reflect.Type {
 
 // spanMetricsProcessor is a trace.SpanProcessor that records the two span metrics from
 // every recorded span. Paired with the AlwaysRecordSampler it sees 100% of spans while
-// export still honors the sampling rate. It also stamps the identity/dedup markers
-// (spec §6) on each span at start so a downstream generator skips spans it already metered.
+// export still honors the sampling rate. It also stamps identity/dedup markers on each
+// span at start; these markers tell CloudWatch ingestion not to regenerate the same
+// metrics from a span this plugin already metered. They have no effect on any other
+// span-to-metrics generator (e.g. the Collector spanmetrics connector), which will still
+// produce its own metrics unless separately configured to skip these spans.
 type spanMetricsProcessor struct {
 	calls    metric.Int64Counter
 	duration metric.Float64Histogram
@@ -144,7 +147,7 @@ func buildInstruments(mp metric.MeterProvider) (calls metric.Int64Counter, durat
 	return c, h, true
 }
 
-// OnStart stamps the schema + library-version markers (spec §6). The presence of the schema
+// OnStart stamps the schema + library-version markers. The presence of the schema
 // marker on a span is the dedup signal. It is written only when the processor is active, so a
 // span the plugin cannot meter is never marked as already-metered.
 func (p *spanMetricsProcessor) OnStart(_ context.Context, span sdktrace.ReadWriteSpan) {

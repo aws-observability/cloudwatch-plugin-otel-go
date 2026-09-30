@@ -104,7 +104,7 @@ func TestMessagingFamily(t *testing.T) {
 	}
 }
 
-// A temporary messaging destination is omitted (unbounded name, spec §4).
+// A temporary messaging destination is omitted (unbounded name).
 func TestMessagingTemporaryDestinationOmitted(t *testing.T) {
 	p := newPipeline(t)
 	p.emit(context.Background(), p.tp.Tracer("app"), "publish", trace.SpanKindProducer,

@@ -20,10 +20,19 @@ import (
 // alwaysRecordSampler wraps a delegate sampler and turns Drop decisions into RecordOnly.
 // Spans the delegate would drop are still recorded, so SpanMetricsProcessor.OnEnd sees
 // them, but they are not sampled/exported, so trace volume still honors the configured
-// sampling rate. The delegate's attributes and trace-state are preserved.
+// sampling rate.
 //
-// OpenTelemetry Go has no first-party record-forcing sampler, so this small wrapper is
-// provided here rather than as an external dependency.
+// The minimum supported OpenTelemetry Go SDK has no first-party record-forcing sampler,
+// so this small wrapper is provided here rather than as an external dependency. SDK
+// v1.40.0+ ships sdktrace.AlwaysRecord; users on those versions may use it instead.
+//
+// Divergence from sdktrace.AlwaysRecord worth noting for users on newer SDKs: when the
+// delegate returns Drop, this wrapper preserves the delegate's returned Attributes and
+// Tracestate and only changes the decision to RecordOnly. sdktrace.AlwaysRecord instead
+// drops those Attributes and resets Tracestate to the parent's. Preserving them keeps any
+// delegate-provided sampling state (e.g. probability/threshold Tracestate) on the recorded
+// span; users who prefer the upstream behavior can switch to sdktrace.AlwaysRecord on
+// v1.40.0+.
 type alwaysRecordSampler struct {
 	delegate sdktrace.Sampler
 }

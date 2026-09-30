@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Base dimensions on every datapoint (spec §3). service.name is deliberately NOT here:
+// Base dimensions on every datapoint. service.name is deliberately NOT here:
 // it lives on the metric resource (the host MeterProvider's resource), so duplicating it
 // per datapoint would add a redundant dimension.
 const (
@@ -30,7 +30,7 @@ const (
 )
 
 // allowlist is the low-cardinality subset OTel semconv defines on the corresponding
-// request metrics (spec §4). It is flat: copy any listed key that is present, regardless
+// request metrics. It is flat: copy any listed key that is present, regardless
 // of span family (a span only carries the keys of its own family). These are the CURRENT
 // semconv keys; legacy predecessors are handled by legacyFallbacks below.
 //
@@ -78,7 +78,7 @@ var allowlist = []attribute.Key{
 
 // legacyFallback maps a current semconv key to the legacy keys checked (in order) when
 // the current key is absent. When a legacy key is present, its key AND value are emitted
-// unchanged — no rename, no value translation (spec §4), because some migrations also
+// unchanged — no rename, no value translation, because some migrations also
 // changed the value vocabulary (e.g. db.system=mssql -> db.system.name=microsoft.sql_server).
 type legacyFallback struct {
 	current attribute.Key
@@ -104,7 +104,7 @@ const (
 )
 
 // buildAttributes produces the metric attribute set for a completed span: the three base
-// dimensions, the identity/schema markers (spec §6), and every allowlisted semconv
+// dimensions, the identity/schema markers, and every allowlisted semconv
 // attribute present (with legacy fallbacks and the temporary/anonymous destination guard).
 func buildAttributes(span sdktrace.ReadOnlySpan) attribute.Set {
 	source := attributesByKey(span.Attributes())
@@ -113,7 +113,7 @@ func buildAttributes(span sdktrace.ReadOnlySpan) attribute.Set {
 		spanNameKey.String(span.Name()),
 		spanKindKey.String(spanKindString(span.SpanKind())),
 		statusCodeKey.String(statusCodeString(span.Status().Code)),
-		// Schema + library-version markers, on both spans and metrics (spec §6).
+		// Schema + library-version markers, on both spans and metrics.
 		attribute.String(schemaAttr, schemaVersion),
 		attribute.String(libVersionAttr, LibVersion),
 	}
@@ -147,7 +147,7 @@ func appendLegacyFallbacks(kvs []attribute.KeyValue, source map[attribute.Key]at
 }
 
 // appendDestinationIfNamed copies messaging.destination.name unless the destination is
-// temporary or anonymous (unbounded names, spec §4).
+// temporary or anonymous (unbounded names).
 func appendDestinationIfNamed(kvs []attribute.KeyValue, source map[attribute.Key]attribute.KeyValue) []attribute.KeyValue {
 	kv, ok := source[messagingDestinationName]
 	if !ok {
@@ -173,7 +173,7 @@ func attributesByKey(kvs []attribute.KeyValue) map[attribute.Key]attribute.KeyVa
 }
 
 // spanKindString maps to the fixed spec vocabulary. Go's SpanKind.String() is lowercase
-// ("server"), so an explicit mapping is used to emit the spec's uppercase values.
+// ("server"), so an explicit mapping is used to emit the fixed uppercase values.
 func spanKindString(kind trace.SpanKind) string {
 	switch kind {
 	case trace.SpanKindServer:
@@ -192,7 +192,7 @@ func spanKindString(kind trace.SpanKind) string {
 }
 
 // statusCodeString maps to the fixed spec vocabulary. Go's codes.Code.String() is
-// "Unset"/"Ok"/"Error" (mixed case), so an explicit mapping emits the spec's uppercase.
+// "Unset"/"Ok"/"Error" (mixed case), so an explicit mapping emits the fixed uppercase values.
 func statusCodeString(code codes.Code) string {
 	switch code {
 	case codes.Ok:

@@ -33,14 +33,14 @@ func TestBaseAttributes(t *testing.T) {
 	if got := mustString(t, m, "status.code"); got != "UNSET" {
 		t.Errorf("status.code = %q, want UNSET", got)
 	}
-	// Identity markers on every datapoint (spec §6).
+	// Identity markers on every datapoint.
 	if got := mustString(t, m, "aws.otel.span.metrics.schema"); got != "v1" {
 		t.Errorf("schema = %q, want v1", got)
 	}
 	if got := mustString(t, m, "aws.otel.extension.lib.version"); got != LibVersion {
 		t.Errorf("lib.version = %q, want %q", got, LibVersion)
 	}
-	// service.name is NOT a datapoint attribute (spec §3) — it lives on the metric resource.
+	// service.name is NOT a datapoint attribute — it lives on the metric resource.
 	absent(t, m, "service.name")
 }
 
@@ -78,7 +78,7 @@ func TestHttpCurrentAttributes(t *testing.T) {
 	if got := mustString(t, m, "http.request.method"); got != "GET" {
 		t.Errorf("http.request.method = %q", got)
 	}
-	// status_code must be emitted as an int, not a string (spec §4).
+	// status_code must be emitted as an int, not a string.
 	if got := mustInt(t, m, "http.response.status_code"); got != 200 {
 		t.Errorf("http.response.status_code = %d, want 200", got)
 	}

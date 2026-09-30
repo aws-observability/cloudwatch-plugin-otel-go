@@ -57,7 +57,7 @@ func TestMode2_GlobalProviderLibrarySpans(t *testing.T) {
 	}
 }
 
-// All span kinds are metered (spec §2).
+// All span kinds are metered.
 func TestAllSpanKindsMetered(t *testing.T) {
 	p := newPipeline(t)
 	tracer := p.tp.Tracer("app")
@@ -73,7 +73,7 @@ func TestAllSpanKindsMetered(t *testing.T) {
 	}
 }
 
-// Duration is emitted in seconds with the connector bucket boundaries (spec §1).
+// Duration is emitted in seconds with the connector bucket boundaries.
 func TestDurationEmittedInSeconds(t *testing.T) {
 	p := newPipeline(t)
 	p.emit(context.Background(), p.tp.Tracer("app"), "op", trace.SpanKindServer)
@@ -95,7 +95,7 @@ func TestDurationEmittedInSeconds(t *testing.T) {
 	}
 }
 
-// The dedup + schema markers appear on the metric datapoints (spec §6).
+// The dedup + schema markers appear on the metric datapoints.
 func TestIdentityMarkersOnMetric(t *testing.T) {
 	p := newPipeline(t)
 	p.emit(context.Background(), p.tp.Tracer("app"), "op", trace.SpanKindServer)

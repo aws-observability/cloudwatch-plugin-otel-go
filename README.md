@@ -106,11 +106,35 @@ Choose the delegate to wrap based on how you configure sampling:
 > processor without the sampler means it only sees exported spans (not 100%); registering it
 > twice double-counts.
 
+> **Note on deduplication:** the plugin marks each span it meters so that **CloudWatch
+> ingestion** does not regenerate the same metrics from it. This marker does not affect other
+> span-to-metrics generators. If you also run the OpenTelemetry Collector's `spanmetrics`
+> connector, it will still produce its own metrics from the same spans (double counting) —
+> disable that connector, or filter these spans out of it, if you only want the in-process
+> metrics.
+
+On shutdown, drain in-flight work and then shut down **both** providers — the tracer
+provider first, then the meter provider — so the final metric interval is exported. The
+processor's own `Shutdown`/`ForceFlush` are no-ops (its measurements belong to the
+`MeterProvider` you passed):
+
+```go
+// ... on service shutdown, after requests have drained:
+_ = tp.Shutdown(ctx) // flush spans
+_ = mp.Shutdown(ctx) // flush the final span-metrics interval
+```
+
 ## Configuration
 
 There are no plugin-specific configuration knobs. Metric destination, export interval, and
 temporality are standard `MeterProvider` configuration you already control. Metric shaping
 (re-bucketing, dropping a dimension, cardinality caps) is done with the SDK's Views.
+
+**Temporality (CloudWatch EMF users):** the OpenTelemetry Go OTLP metric exporter defaults to
+*cumulative* temporality. If you export to the CloudWatch Collector `awsemf` path, configure
+**delta** temporality on the SDK
+(`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta`), otherwise counter and histogram
+values can be misreported.
 
 ## Notes
 
