@@ -1,0 +1,69 @@
+## Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+## SPDX-License-Identifier: Apache-2.0
+
+name: CloudWatch Plugin for OpenTelemetry Nightly Compat
+
+# Runs the build + tests across the supported OpenTelemetry version range so upstream changes that
+# break the plugin's wiring surface without slowing or flaking per-PR builds. Mirrors the Java
+# plugin's nightly-compat layout adapted to Go.
+#
+# The floor point empirically guards the go.mod OpenTelemetry floor (v1.20.0); the latest point
+# catches breakage against newly released OTel core. The "current" point (whatever go.mod pins
+# today) is already covered by pr-build.yml, so it is not repeated here.
+on:
+  schedule:
+    - cron: "30 4 * * *" # daily, offset from other nightly jobs
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compat-tests:
+    name: Build and test (OTel ${{ matrix.otel }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        otel: ["floor", "latest"] # go.mod floor (v1.20.0) and the latest OTel core release
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: stable
+
+      # Pin the 5 OTel core modules to the go.mod floor (v1.20.0) and verify the plugin still
+      # builds and tests green against it.
+      - name: Pin OTel core to floor (v1.20.0)
+        if: matrix.otel == 'floor'
+        run: |
+          go get \
+            go.opentelemetry.io/otel@v1.20.0 \
+            go.opentelemetry.io/otel/sdk@v1.20.0 \
+            go.opentelemetry.io/otel/metric@v1.20.0 \
+            go.opentelemetry.io/otel/sdk/metric@v1.20.0 \
+            go.opentelemetry.io/otel/trace@v1.20.0
+          go mod tidy
+
+      # Upgrade the 5 OTel core modules to their latest releases.
+      - name: Upgrade OTel core to latest
+        if: matrix.otel == 'latest'
+        run: |
+          go get -u \
+            go.opentelemetry.io/otel@latest \
+            go.opentelemetry.io/otel/sdk@latest \
+            go.opentelemetry.io/otel/metric@latest \
+            go.opentelemetry.io/otel/sdk/metric@latest \
+            go.opentelemetry.io/otel/trace@latest
+          go mod tidy
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run tests
+        run: go test ./... -race
