@@ -55,6 +55,8 @@ so a downstream generator can skip regenerating metrics for a span the plugin al
 go get github.com/aws-observability/cloudwatch-plugin-otel-go
 ```
 
+Requires Go 1.25 or later and OpenTelemetry Go v1.45.0 or later.
+
 ## Usage
 
 Register the record-forcing sampler and the span-metrics processor on your `TracerProvider`,

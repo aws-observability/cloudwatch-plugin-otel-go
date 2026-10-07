@@ -1,14 +1,18 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Minimal, non-noisy golangci-lint config for the CloudWatch Plugin for OpenTelemetry (Go).
-# Keeps the default linter set and adds gofmt, govet, and staticcheck. Deliberately does NOT
-# enable strict/opinionated linters (e.g. exhaustruct, wsl) that would generate noise without
-# catching real defects.
+# Keeps golangci-lint's standard linter set (errcheck, govet, ineffassign, staticcheck, unused)
+# and checks formatting with gofmt. Deliberately does NOT enable strict/opinionated linters
+# (e.g. exhaustruct, wsl) that would generate noise without catching real defects.
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
-  # Keep golangci-lint's default linters (errcheck, gosimple, govet, ineffassign,
-  # staticcheck, unused) and add gofmt explicitly.
+  default: standard
+
+formatters:
   enable:
     - gofmt
-    - govet
-    - staticcheck
