@@ -24,7 +24,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -45,7 +44,7 @@ type pipeline struct {
 func newPipeline(t *testing.T) *pipeline {
 	t.Helper()
 	res, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(testService)))
+		resource.NewSchemaless(attribute.String("service.name", testService)))
 	if err != nil {
 		t.Fatalf("resource: %v", err)
 	}

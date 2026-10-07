@@ -7,7 +7,7 @@ name: CloudWatch Plugin for OpenTelemetry Nightly Compat
 # break the plugin's wiring surface without slowing or flaking per-PR builds. Mirrors the Java
 # plugin's nightly-compat layout adapted to Go.
 #
-# The floor point empirically guards the go.mod OpenTelemetry floor (v1.20.0); the latest point
+# The floor point empirically guards the go.mod OpenTelemetry floor (v1.45.0); the latest point
 # catches breakage against newly released OTel core. The "current" point (whatever go.mod pins
 # today) is already covered by pr-build.yml, so it is not repeated here.
 on:
@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otel: ["floor", "latest"] # go.mod floor (v1.20.0) and the latest OTel core release
+        otel: ["floor", "latest"] # go.mod floor (v1.45.0) and the latest OTel core release
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
@@ -37,17 +37,17 @@ jobs:
         with:
           go-version: stable
 
-      # Pin the 5 OTel core modules to the go.mod floor (v1.20.0) and verify the plugin still
+      # Pin the 5 OTel core modules to the go.mod floor (v1.45.0) and verify the plugin still
       # builds and tests green against it.
-      - name: Pin OTel core to floor (v1.20.0)
+      - name: Pin OTel core to floor (v1.45.0)
         if: matrix.otel == 'floor'
         run: |
           go get \
-            go.opentelemetry.io/otel@v1.20.0 \
-            go.opentelemetry.io/otel/sdk@v1.20.0 \
-            go.opentelemetry.io/otel/metric@v1.20.0 \
-            go.opentelemetry.io/otel/sdk/metric@v1.20.0 \
-            go.opentelemetry.io/otel/trace@v1.20.0
+            go.opentelemetry.io/otel@v1.45.0 \
+            go.opentelemetry.io/otel/sdk@v1.45.0 \
+            go.opentelemetry.io/otel/metric@v1.45.0 \
+            go.opentelemetry.io/otel/sdk/metric@v1.45.0 \
+            go.opentelemetry.io/otel/trace@v1.45.0
           go mod tidy
 
       # Upgrade the 5 OTel core modules to their latest releases.
