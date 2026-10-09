@@ -33,6 +33,34 @@ func TestHttpServerFamily(t *testing.T) {
 	}
 }
 
+// HTTP server spans with legacy semconv carry the client's ephemeral port as net.peer.port;
+// requests from different client ports must still aggregate into one series.
+func TestHttpServerLegacyClientPortNotADimension(t *testing.T) {
+	p := newPipeline(t)
+	tracer := p.tp.Tracer("app")
+	for _, clientPort := range []int{50001, 50002, 50003} {
+		p.emit(context.Background(), tracer, "GET /items/:id", trace.SpanKindServer,
+			attribute.String("http.method", "GET"),
+			attribute.Int("http.status_code", 200),
+			attribute.String("http.route", "/items/:id"),
+			attribute.String("net.host.name", "payments.example.com"),
+			attribute.Int("net.host.port", 8443),
+			attribute.String("net.peer.name", "client.example.com"),
+			attribute.Int("net.peer.port", clientPort),
+		)
+	}
+	m, count := callsDataPoint(t, p.collect(t))
+	if count != 3 {
+		t.Errorf("calls = %d, want 3", count)
+	}
+	if hasKey(m, "net.peer.port") || hasKey(m, "net.peer.name") {
+		t.Errorf("client net.peer.* must not be a dimension on SERVER spans; attrs=%v", m)
+	}
+	if got := str(t, m, "net.host.name"); got != "payments.example.com" {
+		t.Errorf("net.host.name = %q", got)
+	}
+}
+
 // DB client span with legacy semconv (as OTel instrumentation still emits) passes through
 // under the legacy keys/values unchanged.
 func TestDbClientFamilyLegacy(t *testing.T) {

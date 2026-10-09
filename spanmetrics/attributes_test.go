@@ -175,6 +175,86 @@ func TestPeerLegacyFallbackFirstPresentWins(t *testing.T) {
 	}
 }
 
+func TestPeerLegacyServerSpanPrefersHostOverClientPeer(t *testing.T) {
+	// On a SERVER span the legacy net.peer.* keys describe the client; net.peer.port is the
+	// client's ephemeral port and would make every connection a new metric series.
+	span := recordSpan(t, "op", trace.SpanKindServer, false,
+		attribute.String("net.peer.name", "client.example.com"),
+		attribute.Int("net.peer.port", 54321),
+		attribute.String("net.host.name", "payments.example.com"),
+		attribute.Int("net.host.port", 8443),
+	)
+	m := attrMap(buildAttributes(span))
+	if got := mustString(t, m, "net.host.name"); got != "payments.example.com" {
+		t.Errorf("net.host.name = %q, want payments.example.com", got)
+	}
+	if got := mustInt(t, m, "net.host.port"); got != 8443 {
+		t.Errorf("net.host.port = %d, want 8443", got)
+	}
+	for _, key := range []string{"net.peer.name", "net.peer.port", "server.address", "server.port"} {
+		absent(t, m, key)
+	}
+}
+
+func TestPeerLegacyServerSpanWithOnlyClientPeerEmitsNoPeerDimension(t *testing.T) {
+	span := recordSpan(t, "op", trace.SpanKindServer, false,
+		attribute.String("net.peer.name", "client.example.com"),
+		attribute.Int("net.peer.port", 54321),
+	)
+	m := attrMap(buildAttributes(span))
+	for _, key := range []string{"net.peer.name", "net.peer.port", "net.host.name", "net.host.port", "server.address", "server.port"} {
+		absent(t, m, key)
+	}
+}
+
+func TestPeerLegacyKeptForNonServerKinds(t *testing.T) {
+	// On CLIENT/PRODUCER/CONSUMER spans net.peer.* is the remote server or broker, so it is kept.
+	for _, kind := range []trace.SpanKind{trace.SpanKindClient, trace.SpanKindProducer, trace.SpanKindConsumer, trace.SpanKindInternal} {
+		t.Run(spanKindString(kind), func(t *testing.T) {
+			span := recordSpan(t, "op", kind, false,
+				attribute.String("net.peer.name", "payments.example.com"),
+				attribute.Int("net.peer.port", 8443),
+				attribute.String("net.host.name", "local.example.com"),
+				attribute.Int("net.host.port", 54321),
+			)
+			m := attrMap(buildAttributes(span))
+			if got := mustString(t, m, "net.peer.name"); got != "payments.example.com" {
+				t.Errorf("net.peer.name = %q, want payments.example.com", got)
+			}
+			if got := mustInt(t, m, "net.peer.port"); got != 8443 {
+				t.Errorf("net.peer.port = %d, want 8443", got)
+			}
+			absent(t, m, "net.host.name")
+			absent(t, m, "net.host.port")
+		})
+	}
+}
+
+func TestPeerStableServerAttributesWinForAllKinds(t *testing.T) {
+	for _, kind := range []trace.SpanKind{trace.SpanKindServer, trace.SpanKindClient} {
+		t.Run(spanKindString(kind), func(t *testing.T) {
+			span := recordSpan(t, "op", kind, false,
+				attribute.String("server.address", "payments.example.com"),
+				attribute.Int("server.port", 8443),
+				attribute.String("net.peer.name", "other.example.com"),
+				attribute.Int("net.peer.port", 54321),
+				attribute.String("net.host.name", "local.example.com"),
+				attribute.Int("net.host.port", 8080),
+			)
+			m := attrMap(buildAttributes(span))
+			if got := mustString(t, m, "server.address"); got != "payments.example.com" {
+				t.Errorf("server.address = %q, want payments.example.com", got)
+			}
+			if got := mustInt(t, m, "server.port"); got != 8443 {
+				t.Errorf("server.port = %d, want 8443", got)
+			}
+			for _, key := range []string{"net.peer.name", "net.peer.port", "net.host.name", "net.host.port"} {
+				absent(t, m, key)
+			}
+		})
+	}
+}
+
 func TestMessagingDestinationNamed(t *testing.T) {
 	span := recordSpan(t, "publish", trace.SpanKindProducer, false,
 		attribute.String("messaging.system", "kafka"),
