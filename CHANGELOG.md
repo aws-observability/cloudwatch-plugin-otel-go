@@ -15,3 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `NewSpanMetricsProcessor` — a `trace.SpanProcessor` that records
     `traces.span.metrics.calls` and `traces.span.metrics.duration` in `OnEnd`, and stamps the
     identity/dedup markers on spans.
+
+### Fixed
+
+- Fix unbounded span metrics cardinality on SERVER spans: the legacy fallback for
+  `server.address`/`server.port` now uses `net.host.name`/`net.host.port` on SERVER spans instead of
+  `net.peer.name`/`net.peer.port`, which describe the client (including its ephemeral port).
