@@ -22,7 +22,7 @@ const (
 // allowlist is the low-cardinality subset OTel semconv defines on the corresponding
 // request metrics. It is flat: copy any listed key that is present, regardless
 // of span family (a span only carries the keys of its own family). These are the CURRENT
-// semconv keys; legacy predecessors are handled by legacyFallbacks below.
+// semconv keys; legacy predecessors are handled by legacyFallbacks and peerLegacyFallbacks below.
 //
 // Every allowlisted attribute is a string except http.response.status_code and
 // server.port (int), and aws.dynamodb.table_names (string slice); those are copied under
@@ -82,9 +82,22 @@ var legacyFallbacks = []legacyFallback{
 	{current: "db.system.name", legacy: []attribute.Key{"db.system"}},
 	{current: "db.operation.name", legacy: []attribute.Key{"db.operation"}},
 	{current: "db.collection.name", legacy: []attribute.Key{"db.sql.table"}},
-	// Peer network attributes renamed from net.peer.*/net.host.* to server.* in newer semconv.
+}
+
+// Peer network attributes renamed from net.peer.*/net.host.* to server.* in newer semconv.
+// server.* always describes the server, but the legacy net.* fallback depends on span kind:
+// net.peer.* is the remote end of the connection and net.host.* the local end. On SERVER spans
+// the server is therefore net.host.*, while net.peer.* is the client (net.peer.port is its
+// ephemeral port), which must never become a dimension. See the HTTP semconv migration guide:
+// https://opentelemetry.io/docs/specs/semconv/non-normative/http-migration/
+var peerLegacyFallbacks = []legacyFallback{
 	{current: "server.address", legacy: []attribute.Key{"net.peer.name", "net.host.name"}},
 	{current: "server.port", legacy: []attribute.Key{"net.peer.port", "net.host.port"}},
+}
+
+var serverSpanPeerLegacyFallbacks = []legacyFallback{
+	{current: "server.address", legacy: []attribute.Key{"net.host.name"}},
+	{current: "server.port", legacy: []attribute.Key{"net.host.port"}},
 }
 
 const (
@@ -113,7 +126,12 @@ func buildAttributes(span sdktrace.ReadOnlySpan) attribute.Set {
 			kvs = append(kvs, kv)
 		}
 	}
-	kvs = appendLegacyFallbacks(kvs, source)
+	kvs = appendLegacyFallbacks(kvs, source, legacyFallbacks)
+	if span.SpanKind() == trace.SpanKindServer {
+		kvs = appendLegacyFallbacks(kvs, source, serverSpanPeerLegacyFallbacks)
+	} else {
+		kvs = appendLegacyFallbacks(kvs, source, peerLegacyFallbacks)
+	}
 	kvs = appendDestinationIfNamed(kvs, source)
 
 	return attribute.NewSet(kvs...)
@@ -121,8 +139,8 @@ func buildAttributes(span sdktrace.ReadOnlySpan) attribute.Set {
 
 // appendLegacyFallbacks emits, for each current key that is absent from the span, the
 // first present legacy key/value unchanged.
-func appendLegacyFallbacks(kvs []attribute.KeyValue, source map[attribute.Key]attribute.KeyValue) []attribute.KeyValue {
-	for _, fb := range legacyFallbacks {
+func appendLegacyFallbacks(kvs []attribute.KeyValue, source map[attribute.Key]attribute.KeyValue, fallbacks []legacyFallback) []attribute.KeyValue {
+	for _, fb := range fallbacks {
 		if _, ok := source[fb.current]; ok {
 			continue
 		}
