@@ -1,0 +1,91 @@
+## Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+## SPDX-License-Identifier: Apache-2.0
+
+name: Release CloudWatch Plugin for OpenTelemetry
+
+# Manually triggered release. Mirrors the release workflows of the other CloudWatch Plugin for
+# OpenTelemetry languages and aws-otel-go: validate, test, then create a DRAFT GitHub release.
+#
+# A Go module is published by its git tag; there is no package registry. The tag is created only
+# when a maintainer publishes the draft release, which keeps a human check before the version
+# becomes permanent (the Go module proxy caches a version forever once it has been fetched).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, without the leading "v" (e.g. 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release v${{ inputs.version }}
+    runs-on: ubuntu-latest
+    # Requires approval from the Release environment's reviewers before the job runs.
+    environment: Release
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Require the main branch
+        run: |
+          if [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "Releases must be created from main (got '$GITHUB_REF_NAME')."
+            exit 1
+          fi
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      # Validate first so a mistyped version fails fast, before running the tests.
+      - name: Validate version format
+        run: |
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version '$VERSION' is not in X.Y.Z form."
+            exit 1
+          fi
+
+      - name: Validate library version matches workflow input
+        run: |
+          libVersion=$(sed -nE 's/^const LibVersion = "([^"]+)"$/\1/p' spanmetrics/version.go)
+          if [ "$libVersion" != "$VERSION" ]; then
+            echo "Input version '$VERSION' does not match LibVersion '$libVersion' in spanmetrics/version.go."
+            exit 1
+          fi
+
+      - name: Validate CHANGELOG has an entry for this version
+        run: |
+          escaped=$(printf '%s' "$VERSION" | sed 's/\./\\./g')
+          if ! grep -Eq "^## v${escaped} - " CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## v$VERSION - <date>' heading."
+            exit 1
+          fi
+
+      - name: Validate the tag does not already exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists. Go module versions are immutable; release a new version instead."
+            exit 1
+          fi
+
+      - name: Run vet and tests
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "Release v$VERSION" \
+            --notes "Please refer to the [Changelog](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md) for more details." \
+            --draft
