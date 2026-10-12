@@ -1,23 +1,17 @@
-# Changelog
+# Release History: cloudwatch-plugin-otel-go
 
-All notable changes to this project are documented in this file.
+## v0.1.0 - 2026-10-12
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-### Added
-
-- Initial span metrics feature for the OpenTelemetry Go SDK:
-  - `NewAlwaysRecordSampler` — wraps a delegate sampler and converts `Drop` to `RecordOnly`
-    so 100% of spans are recorded while export honors the configured sampling rate.
-  - `NewSpanMetricsProcessor` — a `trace.SpanProcessor` that records
-    `traces.span.metrics.calls` and `traces.span.metrics.duration` in `OnEnd`, and stamps the
-    identity/dedup markers on spans.
-
-### Fixed
-
-- Fix unbounded span metrics cardinality on SERVER spans: the legacy fallback for
-  `server.address`/`server.port` now uses `net.host.name`/`net.host.port` on SERVER spans instead of
-  `net.peer.name`/`net.peer.port`, which describe the client (including its ephemeral port).
+* Initial release: in-process span-derived RED metrics (`traces.span.metrics.calls`,
+  `traces.span.metrics.duration`) for the OpenTelemetry Go SDK, generated from 100% of spans
+  while trace export keeps the configured sampling rate.
+  * `NewSpanMetricsProcessor`: a `trace.SpanProcessor` that records the two metrics and stamps
+    identity/dedup markers on spans and metrics.
+  * `NewAlwaysRecordSampler`: wraps a sampler and converts `Drop` decisions to `RecordOnly`.
+  * `SamplerFromEnv`: resolves the sampler configured by `OTEL_TRACES_SAMPLER` and
+    `OTEL_TRACES_SAMPLER_ARG`, so wrapping it preserves the configured sampling rate.
+  * On SERVER spans, the legacy fallback for `server.address`/`server.port` uses
+    `net.host.name`/`net.host.port`, not the client's `net.peer.name`/`net.peer.port`, so client
+    addresses and ephemeral ports do not become metric dimensions.
+    ([#3](https://github.com/aws-observability/cloudwatch-plugin-otel-go/pull/3))
+* Requires Go 1.25 or later and OpenTelemetry Go v1.45.0 or later.
